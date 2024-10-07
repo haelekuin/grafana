@@ -2,6 +2,8 @@ package cloudmigrationimpl
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -33,6 +35,7 @@ import (
 	libraryelementsfake "github.com/grafana/grafana/pkg/services/libraryelements/fake"
 	libraryelements "github.com/grafana/grafana/pkg/services/libraryelements/model"
 	"github.com/grafana/grafana/pkg/services/ngalert"
+	"github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
 	ngalertstore "github.com/grafana/grafana/pkg/services/ngalert/store"
 	ngalertfakes "github.com/grafana/grafana/pkg/services/ngalert/tests/fakes"
@@ -724,6 +727,34 @@ func TestGetLibraryElementsCommands(t *testing.T) {
 	require.Equal(t, createLibraryElementCmd.UID, cmds[0].UID)
 }
 
+func TestGetAlertMuteTimings(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	t.Run("when the feature flag `onPremToCloudMigrationsAlerts` is not enabled it returns nil", func(t *testing.T) {
+		s := setUpServiceTest(t, false).(*Service)
+		s.features = featuremgmt.WithFeatures(featuremgmt.FlagOnPremToCloudMigrations)
+
+		muteTimeIntervals, err := s.getAlertMuteTimings(ctx, nil)
+		require.NoError(t, err)
+		require.Nil(t, muteTimeIntervals)
+	})
+
+	t.Run("when the feature flag `onPremToCloudMigrationsAlerts` is enabled it returns the mute timings", func(t *testing.T) {
+		muteTimingService := &fakeMuteTimingService{}
+
+		s := setUpServiceTest(t, false).(*Service)
+		s.features = featuremgmt.WithFeatures(featuremgmt.FlagOnPremToCloudMigrations, featuremgmt.FlagOnPremToCloudMigrationsAlerts)
+		s.ngAlert.Api.MuteTimings = muteTimingService
+
+		muteTimeIntervals, err := s.getAlertMuteTimings(ctx, &user.SignedInUser{OrgID: 1})
+		require.NoError(t, err)
+		require.NotNil(t, muteTimeIntervals)
+		require.Len(t, muteTimeIntervals, 1)
+		require.Len(t, muteTimingService.getMuteTimingsCalls, 1)
+	})
+}
+
 func ctxWithSignedInUser() context.Context {
 	c := &contextmodel.ReqContext{
 		SignedInUser: &user.SignedInUser{OrgID: 1},
@@ -772,7 +803,10 @@ func setUpServiceTest(t *testing.T, withDashboardMock bool) cloudmigration.Servi
 		},
 	}
 
-	featureToggles := featuremgmt.WithFeatures(featuremgmt.FlagOnPremToCloudMigrations, featuremgmt.FlagDashboardRestore)
+	featureToggles := featuremgmt.WithFeatures(
+		featuremgmt.FlagOnPremToCloudMigrations,
+		featuremgmt.FlagOnPremToCloudMigrationsAlerts,
+	)
 
 	kvStore := kvstore.ProvideService(sqlStore)
 
@@ -795,9 +829,7 @@ func setUpServiceTest(t *testing.T, withDashboardMock bool) cloudmigration.Servi
 	s, err := ProvideService(
 		cfg,
 		httpclient.NewProvider(),
-		featuremgmt.WithFeatures(
-			featuremgmt.FlagOnPremToCloudMigrations,
-			featuremgmt.FlagDashboardRestore),
+		featureToggles,
 		sqlStore,
 		dsService,
 		secretskv.NewFakeSQLSecretsKVStore(t, sqlStore),
@@ -818,13 +850,12 @@ func setUpServiceTest(t *testing.T, withDashboardMock bool) cloudmigration.Servi
 }
 
 type gmsClientMock struct {
+	getSnapshotResponse   *cloudmigration.GetSnapshotStatusResponse
 	validateKeyCalled     int
 	startSnapshotCalled   int
 	getStatusCalled       int
 	createUploadUrlCalled int
 	reportEventCalled     int
-
-	getSnapshotResponse *cloudmigration.GetSnapshotStatusResponse
 }
 
 func (m *gmsClientMock) ValidateKey(_ context.Context, _ cloudmigration.CloudMigrationSession) error {
@@ -853,4 +884,51 @@ func (m *gmsClientMock) CreatePresignedUploadUrl(ctx context.Context, session cl
 
 func (m *gmsClientMock) ReportEvent(context.Context, cloudmigration.CloudMigrationSession, gmsclient.EventRequestDTO) {
 	m.reportEventCalled++
+}
+
+// Fake Alerts Provisioning Services
+type fakeMuteTimingService struct {
+	getMuteTimingsCalls int
+}
+
+func (s *fakeMuteTimingService) GetMuteTimings(ctx context.Context, orgID int64) ([]definitions.MuteTimeInterval, error) {
+	s.getMuteTimingsCalls++
+
+	rawTimings := `[{
+		"name": "My Unique MuteTiming 1",
+		"time_intervals": [
+			{
+				"times": [{"start_time": "12:12","end_time": "23:23"}],
+				"weekdays": ["monday","wednesday","friday","sunday"],
+				"days_of_month": ["10:20","25:-1"],
+				"months": ["1:6","10:12"],
+				"years": ["2022:2054"],
+				"location": "Africa/Douala"
+			}
+		]
+	}]`
+
+	var muteTimings []definitions.MuteTimeInterval
+
+	if err := json.Unmarshal([]byte(rawTimings), &muteTimings); err != nil {
+		return nil, fmt.Errorf("unmarshal mute timings error: %w", err)
+	}
+
+	return muteTimings, nil
+}
+
+func (s *fakeMuteTimingService) GetMuteTiming(context.Context, string, int64) (definitions.MuteTimeInterval, error) {
+	return definitions.MuteTimeInterval{}, nil
+}
+
+func (s *fakeMuteTimingService) CreateMuteTiming(context.Context, definitions.MuteTimeInterval, int64) (definitions.MuteTimeInterval, error) {
+	return definitions.MuteTimeInterval{}, nil
+}
+
+func (s *fakeMuteTimingService) UpdateMuteTiming(context.Context, definitions.MuteTimeInterval, int64) (definitions.MuteTimeInterval, error) {
+	return definitions.MuteTimeInterval{}, nil
+}
+
+func (s *fakeMuteTimingService) DeleteMuteTiming(context.Context, string, int64, definitions.Provenance, string) error {
+	return nil
 }
