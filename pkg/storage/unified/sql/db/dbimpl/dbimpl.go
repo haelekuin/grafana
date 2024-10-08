@@ -107,12 +107,12 @@ func newResourceDBProvider(grafanaDB infraDB.DB, cfg *setting.Cfg, tracer trace.
 
 	case grafanaDBType == dbTypePostgres:
 		p.registerMetrics = true
-		p.engine, err = getEnginePostgres(fallbackGetter, tracer)
+		p.engine, err = getEnginePostgres(fallbackGetter)
 		return p, err
 
 	case grafanaDBType == dbTypeMySQL:
 		p.registerMetrics = true
-		p.engine, err = getEngineMySQL(fallbackGetter, tracer)
+		p.engine, err = getEngineMySQL(fallbackGetter)
 		return p, err
 
 	// TODO: add support for SQLite

@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/grafana/pkg/storage/unified/sql/db"
 )
 
-func getEngineMySQL(getter *sectionGetter) (*xorm.Engine, error) {
+func getEngineMySQL(getter confGetter) (*xorm.Engine, error) {
 	config := mysql.NewConfig()
 	config.User = getter.String("user")
 	// accept the core Grafana jargon of `password` as well, originally Unified
@@ -65,7 +65,7 @@ func getEngineMySQL(getter *sectionGetter) (*xorm.Engine, error) {
 	return engine, nil
 }
 
-func getEnginePostgres(getter *sectionGetter) (*xorm.Engine, error) {
+func getEnginePostgres(getter confGetter) (*xorm.Engine, error) {
 	dsnKV := map[string]string{
 		"user": getter.String("user"),
 		// accept the core Grafana jargon of `password` as well, originally
