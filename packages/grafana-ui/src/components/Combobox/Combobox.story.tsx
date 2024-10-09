@@ -3,7 +3,7 @@ import { Meta, StoryFn, StoryObj } from '@storybook/react';
 import { Chance } from 'chance';
 import React, { ComponentProps, useEffect, useState } from 'react';
 
-import { useTheme2 } from '../../themes/ThemeContext';
+import { useStyles2, useTheme2 } from '../../themes/ThemeContext';
 import { measureText } from '../../utils/measureText';
 import { Alert } from '../Alert/Alert';
 import { Divider } from '../Divider/Divider';
@@ -11,7 +11,7 @@ import { Field } from '../Forms/Field';
 import { Select } from '../Select/Select';
 
 import { Combobox, ComboboxOption } from './Combobox';
-import { MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT } from './getComboboxStyles';
+import { getComboboxStyles, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT } from './getComboboxStyles';
 
 const chance = new Chance();
 
@@ -113,14 +113,27 @@ const ManyOptionsStory: StoryFn<PropsAndCustomArgs> = ({ numberOfOptions, ...arg
 const SelectComparisonStory: StoryFn<typeof Combobox> = (args) => {
   const [comboboxValue, setComboboxValue] = useState(args.value);
   const theme = useTheme2();
+  const styles = useStyles2(getComboboxStyles);
 
   const selectedOption = args.options.find((opt) => opt.value === comboboxValue);
   const selectedLabel = selectedOption?.label || selectedOption?.value;
   const textToMeasure = typeof selectedLabel === 'number' ? selectedLabel.toString() : (selectedLabel ?? '');
-
+  //console.log(measureText(textToMeasure, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT).width);
   return (
     <div style={{ border: '1px solid ' + theme.colors.border.weak, padding: 16 }}>
-      <Field label="Combobox with default size">
+      <Field label="Combobox with explicit size (25)">
+        <Combobox
+          id="combobox-explicit-size"
+          width={25}
+          value={comboboxValue}
+          options={args.options}
+          onChange={(val) => {
+            setComboboxValue(val?.value || null);
+            action('onChange')(val);
+          }}
+        />
+      </Field>
+      {/* <Field label="Combobox with default size">
         <Combobox
           id="combobox-default-size"
           value={comboboxValue}
@@ -130,9 +143,9 @@ const SelectComparisonStory: StoryFn<typeof Combobox> = (args) => {
             action('onChange')(val);
           }}
         />
-      </Field>
+      </Field> */}
 
-      <Field label="Select with default size">
+      {/* <Field label="Select with default size">
         <Select
           id="select-default-size"
           value={comboboxValue}
@@ -146,18 +159,7 @@ const SelectComparisonStory: StoryFn<typeof Combobox> = (args) => {
 
       <Divider />
 
-      <Field label="Combobox with explicit size (25)">
-        <Combobox
-          id="combobox-explicit-size"
-          width={25}
-          value={comboboxValue}
-          options={args.options}
-          onChange={(val) => {
-            setComboboxValue(val?.value || null);
-            action('onChange')(val);
-          }}
-        />
-      </Field>
+      
 
       <Field label="Select with explicit size (25)">
         <Select
@@ -226,13 +228,16 @@ const SelectComparisonStory: StoryFn<typeof Combobox> = (args) => {
             action('onChange')(val);
           }}
         />
-      </Field>
+      </Field> */}
 
       <Divider />
       <div>
         measureText:
         <br />
-        text to measure: {textToMeasure}
+        text to measure:{' '}
+        <span className={styles.optionLabel} style={{ backgroundColor: 'tomato' }}>
+          {textToMeasure}
+        </span>
         <br />
         size: {measureText(textToMeasure, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT).width}px
       </div>
