@@ -4,12 +4,14 @@ import { Chance } from 'chance';
 import React, { ComponentProps, useEffect, useState } from 'react';
 
 import { useTheme2 } from '../../themes/ThemeContext';
+import { measureText } from '../../utils/measureText';
 import { Alert } from '../Alert/Alert';
 import { Divider } from '../Divider/Divider';
 import { Field } from '../Forms/Field';
 import { Select } from '../Select/Select';
 
 import { Combobox, ComboboxOption } from './Combobox';
+import { MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT } from './getComboboxStyles';
 
 const chance = new Chance();
 
@@ -111,6 +113,10 @@ const ManyOptionsStory: StoryFn<PropsAndCustomArgs> = ({ numberOfOptions, ...arg
 const SelectComparisonStory: StoryFn<typeof Combobox> = (args) => {
   const [comboboxValue, setComboboxValue] = useState(args.value);
   const theme = useTheme2();
+
+  const selectedOption = args.options.find((opt) => opt.value === comboboxValue);
+  const selectedLabel = selectedOption?.label || selectedOption?.value;
+  const textToMeasure = typeof selectedLabel === 'number' ? selectedLabel.toString() : (selectedLabel ?? '');
 
   return (
     <div style={{ border: '1px solid ' + theme.colors.border.weak, padding: 16 }}>
@@ -221,6 +227,15 @@ const SelectComparisonStory: StoryFn<typeof Combobox> = (args) => {
           }}
         />
       </Field>
+
+      <Divider />
+      <div>
+        measureText:
+        <br />
+        text to measure: {textToMeasure}
+        <br />
+        size: {measureText(textToMeasure, MENU_ITEM_FONT_SIZE, MENU_ITEM_FONT_WEIGHT).width}px
+      </div>
     </div>
   );
 };
