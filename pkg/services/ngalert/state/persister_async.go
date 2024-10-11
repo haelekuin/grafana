@@ -9,7 +9,12 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
+	"github.com/grafana/grafana/pkg/services/ngalert/models"
 )
+
+type AlertInstancesRetriever interface {
+	AllInstances(doNotSaveNormalState bool) []models.AlertInstance
+}
 
 type AsyncStatePersister struct {
 	log log.Logger
@@ -30,7 +35,7 @@ func NewAsyncStatePersister(log log.Logger, ticker *clock.Ticker, cfg ManagerCfg
 	}
 }
 
-func (a *AsyncStatePersister) Async(ctx context.Context, cache *cache) {
+func (a *AsyncStatePersister) Async(ctx context.Context, cache AlertInstancesRetriever) {
 	for {
 		select {
 		case <-a.ticker.C:
@@ -49,10 +54,10 @@ func (a *AsyncStatePersister) Async(ctx context.Context, cache *cache) {
 	}
 }
 
-func (a *AsyncStatePersister) fullSync(ctx context.Context, cache *cache) error {
+func (a *AsyncStatePersister) fullSync(ctx context.Context, cache AlertInstancesRetriever) error {
 	startTime := time.Now()
 	a.log.Debug("Full state sync start")
-	instances := cache.asInstances(a.doNotSaveNormalState)
+	instances := cache.AllInstances(a.doNotSaveNormalState)
 	if err := a.store.FullSync(ctx, instances); err != nil {
 		a.log.Error("Full state sync failed", "duration", time.Since(startTime), "instances", len(instances))
 		return err
@@ -64,6 +69,6 @@ func (a *AsyncStatePersister) fullSync(ctx context.Context, cache *cache) error 
 	return nil
 }
 
-func (a *AsyncStatePersister) Sync(_ context.Context, _ trace.Span, _ StateTransitions) {
+func (a *AsyncStatePersister) Sync(_ context.Context, _ trace.Span, _ models.AlertRuleKeyWithGroup, _ StateTransitions) {
 	a.log.Debug("Sync: No-Op")
 }
