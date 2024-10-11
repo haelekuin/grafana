@@ -214,7 +214,7 @@ func (st DBstore) DeleteAlertInstances(ctx context.Context, keys ...models.Alert
 // SaveAlertInstancesForRule is not implemented for instance database store.
 func (st DBstore) SaveAlertInstancesForRule(ctx context.Context, key models.AlertRuleKeyWithGroup, instances []models.AlertInstance) error {
 	st.Logger.Error("SaveAlertInstancesForRule is not implemented for instance database store.")
-	return errors.New("method SaveAlertInstancesForRule is not implemented for instance database store.")
+	return errors.New("method SaveAlertInstancesForRule is not implemented for instance database store")
 }
 
 func (st DBstore) DeleteAlertInstancesByRule(ctx context.Context, key models.AlertRuleKeyWithGroup) error {
